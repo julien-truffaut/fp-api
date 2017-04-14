@@ -37,6 +37,111 @@ Julien Truffaut • `@JulienTruffaut`
 
 - retrieve data from a spreadsheet using names or fix location
 
+---
+# Excel API: XSSFWorkbook
+
+```
+libraryDependencies += "org.apache.poi" % "poi-ooxml"  % "3.15"
+```
+
+```tut:silent
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
+
+def load(fileName: String): XSSFWorkbook =
+    new XSSFWorkbook(getClass.getClassLoader.getResourceAsStream(fileName))
+```
+
+```tut
+val workbook = load("example.xlsx")
+```
+
+---
+# Excel API: Name
+
+```tut
+val oilProd = workbook.getName("OilProd")
+
+val oilProdFormula = oilProd.getRefersToFormula
+```
+
+TODO: Add picture
+
+---
+# Excel API: AreaReference
+
+```tut:silent
+import org.apache.poi.ss.SpreadsheetVersion
+import org.apache.poi.ss.util.AreaReference
+
+val oilProdFormula = workbook.getName("OilProd").getRefersToFormula
+```
+
+```tut
+val area     = new AreaReference(oilProdFormula, SpreadsheetVersion.EXCEL97)
+val cellRefs = area.getAllReferencedCells
+
+cellRefs.foreach(println)
+```
+---
+# Excel API: Cell
+
+```tut
+val cellRef = cellRefs.head
+
+val cell = workbook.getSheet(cellRef.getSheetName).
+  getRow(cellRef.getRow).
+  getCell(cellRef.getCol)
+```
+
+--
+
+```tut
+cell.getNumericCellValue
+```
+
+--
+
+```tut:fail
+cell.getStringCellValue
+```
+
+---
+# SafeCell
+
+```tut:silent
+sealed trait ReaderError extends Product with Serializable
+
+case class InvalidFormat(ref: String, expectedFormat: String, message: String) extends ReaderError
+```
+
+--
+
+```tut:silent
+import cats.syntax.either._
+import org.apache.poi.xssf.usermodel.XSSFCell
+
+case class SafeCell(cell: XSSFCell){
+  def asDouble: Either[ReaderError, Double] =
+    Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
+      InvalidFormat(cell.getReference, "Numeric", e.getMessage)
+    )
+
+  def asString: Either[ReaderError, String] =
+    Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
+      InvalidFormat(cell.getReference, "String", e.getMessage)
+    )
+}
+```
+
+---
+# SafeCell
+
+```tut
+val safeCell = SafeCell(cell)
+
+safeCell.asDouble
+safeCell.asString
+```
 
 ---
 # Inline Scala examples
