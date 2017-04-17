@@ -77,7 +77,7 @@ val oilProdFormula = workbook.getName("OilProd").getRefersToFormula
 ```
 
 ```tut
-val area     = new AreaReference(oilProdFormula, EXCEL97)
+val area = new AreaReference(oilProdFormula, EXCEL97)
 val cellRefs = area.getAllReferencedCells
 
 cellRefs.foreach(println)
@@ -106,12 +106,13 @@ cell.getStringCellValue
 ```
 
 ---
-# SafeCell
+# Cell error handling
 
 ```tut:silent
-sealed trait ReaderError extends Product with Serializable
+sealed trait ParserError extends Product with Serializable
 
-case class InvalidFormat(ref: String, expectedFormat: String, message: String) extends ReaderError
+case class InvalidFormat(ref: String, expectedFormat: String,
+                         message: String) extends ParserError
 ```
 
 --
@@ -121,12 +122,12 @@ import cats.syntax.either._
 import org.apache.poi.xssf.usermodel.XSSFCell
 
 case class SafeCell(cell: XSSFCell){
-  def asDouble: Either[ReaderError, Double] =
+  def asDouble: Either[ParserError, Double] =
     Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
       InvalidFormat(cell.getReference, "Numeric", e.getMessage)
     )
 
-  def asString: Either[ReaderError, String] =
+  def asString: Either[ParserError, String] =
     Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
       InvalidFormat(cell.getReference, "String", e.getMessage)
     )
@@ -134,11 +135,13 @@ case class SafeCell(cell: XSSFCell){
 ```
 
 ---
-# SafeCell
+# Cell error handling
+
+```tut:silent
+val safeCell = SafeCell(cell)
+```
 
 ```tut
-val safeCell = SafeCell(cell)
-
 safeCell.asDouble
 safeCell.asString
 ```
@@ -147,11 +150,17 @@ safeCell.asString
 # API
 
 ```tut:silent
-def numericRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[Double]] = ???
-def numeric(workbook: XSSFWorkbook, name: String): Either[ReaderError, Double] = ???
+def numericRange(workbook: XSSFWorkbook,
+                 name: String): Either[ParserError, List[Double]] = ???
 
-def stringRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[String]] = ???
-def string(workbook: XSSFWorkbook, name: String): Either[ReaderError, String] = ???
+def numeric(workbook: XSSFWorkbook,
+            name: String): Either[ParserError, Double] = ???
+
+def stringRange(workbook: XSSFWorkbook,
+                name: String): Either[ParserError, List[String]] = ???
+
+def string(workbook: XSSFWorkbook,
+           name: String): Either[ParserError, String] = ???
 ```
 
 ```tut:fail:silent
@@ -159,7 +168,7 @@ numericRange(workbook, "OilProduction")
 ```
 
 ---
-# API: Reading Doubles
+# API: Parsing Doubles
 
 ```tut:silent
 import cats.syntax.traverse._
@@ -167,7 +176,7 @@ import cats.instances.either._
 import cats.instances.list._
 
 def numericRange(workbook: XSSFWorkbook,
-                 name: String): Either[ReaderError, List[Double]] = {
+                 name: String): Either[ParserError, List[Double]] = {
   val area  = new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
   val cells = area.getAllReferencedCells.toList.map(cellRef =>
     workbook
@@ -177,17 +186,17 @@ def numericRange(workbook: XSSFWorkbook,
   )
 
   val safeCells: List[SafeCell] = cells.map(SafeCell)
-  val doubles: List[Either[ReaderError, Double]] = safeCells.map(_.asDouble)
+  val doubles: List[Either[ParserError, Double]] = safeCells.map(_.asDouble)
   doubles.sequenceU
 }
 ```
 
 ---
-# API: Reading Doubles
+# API: Parsing Doubles
 
 ```tut:silent
 def numericRange(workbook: XSSFWorkbook,
-                 name: String): Either[ReaderError, List[Double]] = {
+                 name: String): Either[ParserError, List[Double]] = {
   val area = new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
   area.getAllReferencedCells.toList.map(cellRef =>
     workbook
@@ -206,11 +215,11 @@ numericRange(workbook, "PrimaryProduct")
 ```
 
 ---
-# API: Reading Doubles
+# API: Parsing Doubles
 
 ```tut:silent
 def numericRange(workbook: XSSFWorkbook,
-                 name: String): Either[ReaderError, List[Double]] = {
+                 name: String): Either[ParserError, List[Double]] = {
   val area = new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
   area.getAllReferencedCells.toList.map(cellRef =>
     workbook
@@ -226,26 +235,26 @@ numericRange(workbook, "foo")
 ```
 
 ---
-# API: Reading Doubles
+# API: Parsing Doubles
 
 ```tut:silent
 import org.apache.poi.ss.util.{AreaReference, CellReference}
 
-sealed trait ReaderError extends Product with Serializable
+sealed trait ParserError extends Product with Serializable
 
-case class InvalidFormat(ref: String, expectedFormat: String, message: String) extends ReaderError
-case class MissingName(name: String) extends ReaderError
-case class MissingCell(ref: String) extends ReaderError
+case class InvalidFormat(ref: String, expectedFormat: String, message: String) extends ParserError
+case class MissingName(name: String) extends ParserError
+case class MissingCell(ref: String) extends ParserError
 ```
 
 ```tut:invisible
 case class SafeCell(cell: XSSFCell){
-  def asDouble: Either[ReaderError, Double] =
+  def asDouble: Either[ParserError, Double] =
     Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
       InvalidFormat(cell.getReference, "Numeric", e.getMessage)
     )
 
-  def asString: Either[ReaderError, String] =
+  def asString: Either[ParserError, String] =
     Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
       InvalidFormat(cell.getReference, "String", e.getMessage)
     )
@@ -253,12 +262,12 @@ case class SafeCell(cell: XSSFCell){
 ```
 
 ```tut:silent
-def getArea(workbook: XSSFWorkbook, name: String): Either[ReaderError, AreaReference] =
+def getArea(workbook: XSSFWorkbook, name: String): Either[ParserError, AreaReference] =
   Either.catchNonFatal(
     new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
   ).leftMap(_ => MissingName(name))
 
-def getSafeCell(workbook: XSSFWorkbook, cellRef: CellReference): Either[ReaderError, SafeCell] =
+def getSafeCell(workbook: XSSFWorkbook, cellRef: CellReference): Either[ParserError, SafeCell] =
   Either.catchNonFatal(SafeCell(
     workbook
       .getSheet(cellRef.getSheetName)
@@ -268,10 +277,10 @@ def getSafeCell(workbook: XSSFWorkbook, cellRef: CellReference): Either[ReaderEr
 ```
 
 ---
-# API: Reading doubles
+# API: Parsing doubles
 
 ```tut:silent
-def numericRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[Double]] =
+def numericRange(workbook: XSSFWorkbook, name: String): Either[ParserError, List[Double]] =
   for {
     area    <- getArea(workbook, name)
     cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
@@ -286,10 +295,281 @@ numericRange(workbook, "foo")
 ```
 
 ---
-# API: Reading String
+# Parsing Product
 
 ```tut:silent
-def stringRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[String]] =
+case class Production(oil: List[Double], gas: List[Double])
+
+def production(workbook: XSSFWorkbook,
+               oilName: String,
+               gasName: String
+               ): Either[ParserError, Production] = ???
+```
+
+---
+# Parsing Product
+
+
+```tut:silent
+case class Production(oil: List[Double], gas: List[Double])
+
+def production(workbook: XSSFWorkbook,
+               oilName: String,
+               gasName: String
+               ): Either[ParserError, Production] =
+  for {
+    oil <- numericRange(workbook, oilName)
+    gas <- numericRange(workbook, gasName)
+  } yield Production(oil, gas)
+```
+
+---
+# Parser
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: XSSFWorkbook): Either[ParserError, A]
+}
+```
+
+--
+
+```tut:silent
+def numericRange(name: String): Parser[List[Double]] =
+  new Parser[List[Double]]{
+    def parse(workbook: XSSFWorkbook): Either[ParserError, List[Double]] =
+      for {
+        area    <- getArea(workbook, name)
+        cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
+        doubles <- cells.traverseU(_.asDouble)
+      } yield doubles
+  }
+```
+
+--
+
+```tut:silent
+def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
+```
+
+---
+# Parsing Product
+
+```tut:silent
+def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] =
+  new Parser[(A, B)]{
+    def parse(workbook: XSSFWorkbook): Either[ParserError, (A, B)] =
+      for {
+        a <- pa.parse(workbook)
+        b <- pb.parse(workbook)
+      } yield (a, b)
+  }
+```
+
+--
+
+```tut:silent
+val oil = numericRange("OilProd")
+val gas = numericRange("GasProd")
+val foo = numericRange("Foo")
+```
+
+```tut
+product(oil, gas).parse(workbook)
+product(oil, foo).parse(workbook)
+```
+
+---
+# Parsing Product
+
+```tut:silent
+def map[A, B](pa: Parser[A])(f: A => B): Parser[B] =
+  new Parser[B]{
+    def parse(workbook: XSSFWorkbook): Either[ParserError, B] =
+      pa.parse(workbook).map(f)
+  }
+```
+
+--
+
+```tut:silent
+val production = map(product(oil, gas)){case (oil, gas) => Production(oil,gas)}
+```
+
+```tut
+production.parse(workbook)
+```
+
+---
+# Parser is a Cartesian Functor
+
+```tut:silent
+trait Functor[F[_]]{
+  def map[A,B](fa: F[A])(f: A => B): F[B]
+}
+
+trait Cartesian[F[_]]{
+  def product[A, B](fa: F[A], fb: F[B]): F[(A, B)]
+}
+```
+
+--
+
+```tut:invisible
+import cats.{Monad, SemigroupK}
+
+implicit val instance: Monad[Parser] with SemigroupK[Parser] = new Monad[Parser] with SemigroupK[Parser] {
+    def combineK[A](x: Parser[A], y: Parser[A]): Parser[A] = new Parser[A] {
+      def parse(workbook: XSSFWorkbook): Either[ParserError, A] =
+        x.parse(workbook) orElse y.parse(workbook)
+    }
+
+    def flatMap[A, B](fa: Parser[A])(f: A => Parser[B]): Parser[B] =
+      new Parser[B] {
+        def parse(workbook: XSSFWorkbook): Either[ParserError, B] =
+          fa.parse(workbook).flatMap(f(_).parse(workbook))
+      }
+
+    def tailRecM[A, B](a: A)(f: A => Parser[Either[A, B]]): Parser[B] = new Parser[B] {
+      def parse(workbook: XSSFWorkbook): Either[ParserError, B] = {
+        def loop(thisA: A): Either[ParserError, B] = f(thisA).parse(workbook) match {
+          case Left(a1)        => Left(a1)
+          case Right(Left(a1)) => loop(a1)
+          case Right(Right(b)) => Right(b)
+        }
+        loop(a)
+      }
+    }
+
+    def pure[A](a: A): Parser[A] = new Parser[A]{
+      def parse(workbook: XSSFWorkbook) = Right(a)
+    }
+  }
+```
+
+```tut:silent
+import cats.syntax.all._
+
+val oil = numericRange("OilProd")
+val gas = numericRange("GasProd")
+
+val production = (oil |@| gas).map(Production)
+```
+
+--
+
+```tut:silent
+(oil |@| gas |@| foo)
+```
+
+---
+# Coproduct
+
+```tut:silent
+sealed trait Fee extends Product with Serializable
+case class TechnicalFee(technical: Double) extends Fee
+case class ExplorationFee(exploration: Double, postExploration: Double) extends Fee
+```
+
+--
+
+```tut:invisible
+def numeric(name: String): Parser[Double] =
+  new Parser[Double]{
+    def parse(workbook: XSSFWorkbook) =
+      for {
+        area    <- getArea(workbook, name)
+        cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
+        double  <- cells.head.asDouble
+      } yield double
+  }
+```
+
+```tut:silent
+val technicalFee: Parser[TechnicalFee] =
+  numeric("TechnicalFee").map(TechnicalFee)
+
+val explorationFee: Parser[ExplorationFee] =
+  (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).
+    map(ExplorationFee)
+```
+
+--
+
+```tut
+technicalFee.parse(workbook)
+explorationFee.parse(workbook)
+```
+
+```tut:fail:silent
+val fee: Parser[Fee] = ???
+```
+
+---
+# Combine
+
+```tut:silent
+def combine[A](p1: Parser[A], p2: Parser[A]): Parser[A] = new Parser[A]{
+  def parse(workbook: XSSFWorkbook): Either[ParserError, A] =
+    p1.parse(workbook) orElse p2.parse(workbook)
+}
+```
+
+--
+
+```tut:fail
+val fee = combine(technicalFee, explorationFee)
+```
+
+---
+# Combine
+
+```tut:silent
+val fee = combine(
+  technicalFee.map(f => f: Fee),
+  explorationFee.map(f => f: Fee)
+)
+```
+
+--
+
+```tut:silent
+val fee = combine(
+  technicalFee.widen[Fee],
+  explorationFee.widen[Fee]
+)
+```
+
+```tut
+fee.parse(workbook)
+```
+
+---
+# Parser is a SemigroupK
+
+```scala
+trait SemigroupK[F[_]]{
+  def combineK[A](x: F[A], y: F[A]): F[A]
+}
+
+trait Semigroup[A]{
+  def combineK(x: A, y: A): A
+}
+```
+
+```tut:silent
+val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
+```
+
+```tut
+fee.parse(workbook)
+```
+
+---
+# API: Parsing String
+
+```tut:silent
+def stringRange(workbook: XSSFWorkbook, name: String): Either[ParserError, List[String]] =
   for {
     area    <- getArea(workbook, name)
     cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
@@ -300,7 +580,7 @@ def stringRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[
 --
 
 ```tut:silent
-def numericRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[Double]] =
+def numericRange(workbook: XSSFWorkbook, name: String): Either[ParserError, List[Double]] =
   for {
     area    <- getArea(workbook, name)
     cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
@@ -309,19 +589,19 @@ def numericRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List
 ```
 
 ---
-# API: Reading Cells
+# API: Parsing Cells
 
 ```tut:silent
-def range(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[SafeCell]] =
+def range(workbook: XSSFWorkbook, name: String): Either[ParserError, List[SafeCell]] =
   for {
     area  <- getArea(workbook, name)
     cells <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
   } yield cells
 
-def numericRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[Double]] =
+def numericRange(workbook: XSSFWorkbook, name: String): Either[ParserError, List[Double]] =
   range(workbook, name).flatMap(_.traverseU(_.asDouble))
 
-def stringRange(workbook: XSSFWorkbook, name: String): Either[ReaderError, List[String]] =
+def stringRange(workbook: XSSFWorkbook, name: String): Either[ParserError, List[String]] =
   range(workbook, name).flatMap(_.traverseU(_.asString))
 ```
 
@@ -334,14 +614,14 @@ case class Production(oil: List[Double], gas: List[Double])
 def production(workbook: XSSFWorkbook,
                oilName: String,
                gasName: String
-               ): Either[ReaderError, Production] = ???
+               ): Either[ParserError, Production] = ???
 ```
 
 --
 
 ```tut:silent
 def numericRange(workbook: XSSFWorkbook,
-                 name: String): Either[ReaderError, List[Double]] =
+                 name: String): Either[ParserError, List[Double]] =
   range(workbook, name).flatMap(_.traverseU(_.asDouble))
 ```
 
@@ -350,7 +630,7 @@ def numericRange(workbook: XSSFWorkbook,
 
 ```tut:silent
 trait Parser[A]{
-  def parse(workbook: XSSFWorkbook): Either[ReaderError, A]
+  def parse(workbook: XSSFWorkbook): Either[ParserError, A]
 }
 ```
 
@@ -359,7 +639,7 @@ trait Parser[A]{
 ```tut:silent
 def range(name: String): Parser[List[SafeCell]] =
   new Parser[List[SafeCell]]{
-    def parse(workbook: XSSFWorkbook): Either[ReaderError, List[SafeCell]] =
+    def parse(workbook: XSSFWorkbook): Either[ParserError, List[SafeCell]] =
       for {
         area  <- getArea(workbook, name)
         cells <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
@@ -379,22 +659,22 @@ def numericRange(name: String): Parser[List[Double]] =
 
 ```tut:silent
 trait Parser[A]{ self =>
-  def parse(workbook: XSSFWorkbook): Either[ReaderError, A]
+  def parse(workbook: XSSFWorkbook): Either[ParserError, A]
 
   def map[B](f: A => B): Parser[B] = new Parser[B]{
-    def parse(workbook: XSSFWorkbook): Either[ReaderError, B] =
+    def parse(workbook: XSSFWorkbook): Either[ParserError, B] =
       self.parse(workbook).map(f)
   }
 
   def flatMap[B](f: A => Parser[B]): Parser[B] = new Parser[B] {
-    def parse(workbook: XSSFWorkbook): Either[ReaderError, B] =
+    def parse(workbook: XSSFWorkbook): Either[ParserError, B] =
       self.parse(workbook).flatMap(f(_).parse(workbook))
   }
 
-   def flatMapF[B](f: A => Either[ReaderError, B]): Parser[B] =
+   def flatMapF[B](f: A => Either[ParserError, B]): Parser[B] =
     flatMap(a =>
       new Parser[B] {
-        def parse(workbook: XSSFWorkbook): Either[ReaderError, B] =
+        def parse(workbook: XSSFWorkbook): Either[ParserError, B] =
           f(a)
       }
     )
@@ -407,7 +687,7 @@ trait Parser[A]{ self =>
 ```tut:invisible
 def range(name: String): Parser[List[SafeCell]] =
   new Parser[List[SafeCell]]{
-    def parse(workbook: XSSFWorkbook): Either[ReaderError, List[SafeCell]] =
+    def parse(workbook: XSSFWorkbook): Either[ParserError, List[SafeCell]] =
       for {
         area  <- getArea(workbook, name)
         cells <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
@@ -455,7 +735,7 @@ def single(name: String): Parser[SafeCell] = ???
 
 ```tut:invisible
 def single(name: String): Parser[SafeCell] = new Parser[SafeCell] {
-    def parse(workbook: XSSFWorkbook): Either[ReaderError, SafeCell] =
+    def parse(workbook: XSSFWorkbook): Either[ParserError, SafeCell] =
       for {
         area  <- getArea(workbook, name)
         _     <- if(area.getAllReferencedCells.length == 1) Right(())
@@ -537,7 +817,7 @@ explorationFees.parse(workbook)
 
 ```tut:silent
 def or[A](p1: Parser[A], p2: Parser[A]): Parser[A] = new Parser[A]{
-  def parse(workbook: XSSFWorkbook): Either[ReaderError, A] =
+  def parse(workbook: XSSFWorkbook): Either[ParserError, A] =
     p1.parse(workbook) orElse p2.parse(workbook)
 }
 
@@ -573,19 +853,19 @@ implicit val instance: Monad[Parser] with SemigroupK[Parser] = new Monad[Parser]
 ```tut:invisible
 implicit val instance: Monad[Parser] with SemigroupK[Parser] = new Monad[Parser] with SemigroupK[Parser] {
     def combineK[A](x: Parser[A], y: Parser[A]): Parser[A] = new Parser[A] {
-      def parse(workbook: XSSFWorkbook): Either[ReaderError, A] =
+      def parse(workbook: XSSFWorkbook): Either[ParserError, A] =
         x.parse(workbook) orElse y.parse(workbook)
     }
 
     def flatMap[A, B](fa: Parser[A])(f: A => Parser[B]): Parser[B] =
       new Parser[B] {
-        def parse(workbook: XSSFWorkbook): Either[ReaderError, B] =
+        def parse(workbook: XSSFWorkbook): Either[ParserError, B] =
           fa.parse(workbook).flatMap(f(_).parse(workbook))
       }
 
     def tailRecM[A, B](a: A)(f: A => Parser[Either[A, B]]): Parser[B] = new Parser[B] {
-      def parse(workbook: XSSFWorkbook): Either[ReaderError, B] = {
-        def loop(thisA: A): Either[ReaderError, B] = f(thisA).parse(workbook) match {
+      def parse(workbook: XSSFWorkbook): Either[ParserError, B] = {
+        def loop(thisA: A): Either[ParserError, B] = f(thisA).parse(workbook) match {
           case Left(a1)        => Left(a1)
           case Right(Left(a1)) => loop(a1)
           case Right(Right(b)) => Right(b)
@@ -626,42 +906,10 @@ production.parse(workbook)
 
 
 ---
-# Inline Scala examples
-
-```tut:silent
-case class Person(name: String, age: Int)
-```
-
-```tut:book
-val john = Person("John", 23)
-
-john.age
-
-john.copy(age = 30)
-```
-
-???
-- see https://github.com/tpolecat/tut
-
----
-# Scala examples from core module
-
-```tut:silent
-import parser.Foo.{FooInt, FooString}
-```
-
-```tut:book
-val fooInt = FooInt(5)
-val fooString = FooString("Hello World")
-
-val foos = List(fooInt, fooString)
-```
-
----
 class: center, middle
 
 # Thanks!
-Code and slides at `julien-truffaut/excel` on GitHub
+Code and slides at `julien-truffaut/excel-parser` on GitHub
 
 ## Questions?
 
