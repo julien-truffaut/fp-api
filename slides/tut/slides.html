@@ -35,12 +35,18 @@ Julien Truffaut • `@JulienTruffaut`
 ---
 # Goals
 
-- retrieve data from a spreadsheet using names or fix location
+- retrieve data from a spreadsheet using names
+- use a safe API (no exception, no null)
+- provide combinators to parse a case class hierarchy
+
+# Not a Goal
+
+- create a general excel parsing library
 
 ---
 # Excel API: XSSFWorkbook
 
-```
+```scala
 libraryDependencies += "org.apache.poi" % "poi-ooxml"  % "3.15"
 ```
 
@@ -55,6 +61,15 @@ def load(fileName: String): XSSFWorkbook =
 val workbook = load("example.xlsx")
 ```
 
+--
+
+```
+
+
+```
+
+All codes and slides are available on github at `julien-truffaut/excel-parser`
+
 ---
 # Excel API: Name
 
@@ -64,7 +79,7 @@ val oilProd = workbook.getName("OilProd")
 val oilProdFormula = oilProd.getRefersToFormula
 ```
 
-TODO: Add picture
+.center[![workbook](workbook.png)]
 
 ---
 # Excel API: AreaReference
