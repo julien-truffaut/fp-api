@@ -1,10 +1,10 @@
 package parser
 
-import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.apache.poi.ss.usermodel.{Workbook, WorkbookFactory}
 
 object io {
 
-  def load(fileName: String): XSSFWorkbook =
-    new XSSFWorkbook(getClass.getClassLoader.getResourceAsStream(fileName))
+  def load(fileName: String): Workbook =
+    WorkbookFactory.create(getClass.getClassLoader.getResourceAsStream(fileName))
 
 }

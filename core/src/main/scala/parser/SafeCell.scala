@@ -1,25 +1,27 @@
 package parser
 
 import cats.syntax.either._
-import org.apache.poi.xssf.usermodel.XSSFCell
+import org.apache.poi.ss.usermodel.Cell
 
-case class SafeCell(cell: XSSFCell){
-  def asDouble: Either[ReaderError, Double] =
+case class SafeCell(cell: Cell){
+  val reference = s"${cell.getSheet.getSheetName}!${cell.getAddress}"
+
+  def asDouble: Either[ParserError, Double] =
     Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
-      ReaderError.invalidFormat(cell.getReference, "Numeric", e.getMessage)
+      ParserError.invalidFormat(reference, "Numeric", e.getMessage)
     )
 
-  def asInt: Either[ReaderError, Int] =
-    asDouble.flatMap(d => Either.fromOption(doubleToInt(d), ReaderError.invalidFormat(cell.getReference, "Int", s"$d is not an Int")))
+  def asInt: Either[ParserError, Int] =
+    asDouble.flatMap(d => Either.fromOption(doubleToInt(d), ParserError.invalidFormat(reference, "Int", s"$d is not an Int")))
 
-  def asString: Either[ReaderError, String] =
+  def asString: Either[ParserError, String] =
     Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
-      ReaderError.invalidFormat(cell.getReference, "String", e.getMessage)
+      ParserError.invalidFormat(reference, "String", e.getMessage)
     )
 
-  def asBoolean: Either[ReaderError, Boolean] =
+  def asBoolean: Either[ParserError, Boolean] =
     Either.catchNonFatal(cell.getBooleanCellValue).leftMap(e =>
-      ReaderError.invalidFormat(cell.getReference, "Boolean", e.getMessage)
+      ParserError.invalidFormat(reference, "Boolean", e.getMessage)
     )
 
   private def doubleToInt(d: Double): Option[Int] =
