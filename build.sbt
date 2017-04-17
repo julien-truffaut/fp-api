@@ -14,6 +14,7 @@ lazy val baseSettings: Seq[Setting[_]] = Seq(
     "-Ywarn-value-discard",
     "-Xfuture"
   ),
+  addCompilerPlugin("org.spire-math"  % "kind-projector" % "0.9.3" cross CrossVersion.binary),
   resolvers += Resolver.sonatypeRepo("releases")
 )
 

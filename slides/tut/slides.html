@@ -26,22 +26,23 @@
 class: center, middle
 
 # Excel Parser
-Julien Truffaut • `@JulienTruffaut`
+`@JulienTruffaut`
 
 ???
 - notes here
 - see https://remarkjs.com/#1
 
 ---
+# Use case
+
+.center[![workbook](workbook-all.png)]
+
+---
 # Goals
 
 - retrieve data from a spreadsheet using names
 - use a safe API (no exception, no null)
-- provide combinators to parse a case class hierarchy
-
-# Not a Goal
-
-- create a general excel parsing library
+- provide combinators to parse into a case class hierarchy
 
 ---
 # Excel API: Workbook
@@ -60,8 +61,6 @@ def load(fileName: String): Workbook =
 ```tut
 val workbook = load("example.xlsx")
 ```
-
---
 
 ```
 
@@ -164,7 +163,7 @@ safeCell.asString
 ```
 
 ---
-# API
+# Parsing API
 
 ```tut:silent
 def numericRange(workbook: Workbook,
@@ -185,7 +184,7 @@ numericRange(workbook, "OilProduction")
 ```
 
 ---
-# API: Parsing Doubles
+# Parsing Doubles
 
 ```tut:silent
 import cats.syntax.traverse._
@@ -194,8 +193,9 @@ import cats.instances.list._
 
 def numericRange(workbook: Workbook,
                  name: String): Either[ParserError, List[Double]] = {
-  val area  = new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
-  val cells = area.getAllReferencedCells.toList.map(cellRef =>
+  val formula = workbook.getName(name).getRefersToFormula
+  val area    = new AreaReference(formula, EXCEL97)
+  val cells   = area.getAllReferencedCells.toList.map(cellRef =>
     workbook
       .getSheet(cellRef.getSheetName)
       .getRow(cellRef.getRow)
@@ -209,7 +209,7 @@ def numericRange(workbook: Workbook,
 ```
 
 ---
-# API: Parsing Doubles
+# Parsing Doubles
 
 ```tut:silent
 def numericRange(workbook: Workbook,
@@ -232,7 +232,7 @@ numericRange(workbook, "PrimaryProduct")
 ```
 
 ---
-# API: Parsing Doubles
+# Parsing Doubles
 
 ```tut:silent
 def numericRange(workbook: Workbook,
@@ -252,7 +252,7 @@ numericRange(workbook, "foo")
 ```
 
 ---
-# API: Parsing Doubles
+# Parsing Doubles
 
 ```tut:silent
 import org.apache.poi.ss.util.{AreaReference, CellReference}
@@ -295,7 +295,7 @@ def getSafeCell(workbook: Workbook, cellRef: CellReference): Either[ParserError,
 ```
 
 ---
-# API: Parsing doubles
+# Parsing doubles
 
 ```tut:silent
 def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] =
@@ -575,12 +575,64 @@ trait Semigroup[A]{
 }
 ```
 
+--
+
 ```tut:silent
 val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
 ```
 
 ```tut
 fee.parse(workbook)
+```
+
+---
+# How to find abstractions
+
+```tut:silent
+def numericRange(workbook: Workbook,
+                 name: String): Either[ParserError, List[Double]] = ???
+```
+
+--
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: Workbook): Either[ParserError, A]
+}
+
+def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
+```
+
+--
+
+```tut:silent
+def product[F[_], A, B](pa: F[A], pb: F[B]): F[(A, B)] = ???
+```
+
+---
+# How to find abstractions
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: Workbook): Either[ParserError, A]
+}
+```
+
+--
+
+```tut:silent
+case class Kleisli[F[_], A, B](run: A => F[B])
+
+type Parser[A] = Kleisli[Either[ParserError, ?], Workbook, A]
+```
+
+--
+
+```tut:silent
+import cats.Semigroup
+
+implicit def semigroup[F[_], A, B](implicit ev: Semigroup[F[B]])
+  : Semigroup[Kleisli[F, A, B]] = ???
 ```
 
 ---
