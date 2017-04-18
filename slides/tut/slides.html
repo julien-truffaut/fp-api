@@ -99,12 +99,17 @@ cellRefs.foreach(println)
 ---
 # Excel API: Cell
 
-```tut
+```tut:silent
 val cellRef = cellRefs.head
 
-val cell = workbook.getSheet(cellRef.getSheetName).
+val cell = workbook.
+  getSheet(cellRef.getSheetName).
   getRow(cellRef.getRow).
   getCell(cellRef.getCol)
+```
+
+```tut
+cell
 ```
 
 --
@@ -340,6 +345,46 @@ def production(workbook: Workbook,
     oil <- numericRange(workbook, oilName)
     gas <- numericRange(workbook, gasName)
   } yield Production(oil, gas)
+```
+
+---
+# Parsing Product
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: Workbook, name: String): Either[ParserError, A]
+}
+
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
+
+val numericRange = new Parser[List[Double]]{
+  def parse(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
+}
+```
+
+--
+
+```tut:silent
+def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
+```
+
+---
+# Parsing Product
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: Workbook, name: String): Either[ParserError, A]
+}
+
+
+def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] =
+  new Parser[(A, B)]{
+    def parse(workbook: Workbook, name: String): Either[ParserError, (A, B)] =
+      for {
+        a <- pa.parse(workbook, ???)
+        b <- pb.parse(workbook, ???)
+      } yield (a, b)
+  }
 ```
 
 ---
