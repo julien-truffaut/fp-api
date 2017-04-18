@@ -5,7 +5,6 @@ import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import cats.{Monad, SemigroupK}
-import org.apache.poi.ss.SpreadsheetVersion
 import org.apache.poi.ss.usermodel.Workbook
 import org.apache.poi.ss.util.{AreaReference, CellReference}
 import parser.ParserError._
@@ -93,7 +92,7 @@ object Parser {
 
   def getArea(workbook: Workbook, name: String): Either[ParserError, AreaReference] =
     Either.catchNonFatal(
-       new AreaReference(workbook.getName(name).getRefersToFormula, SpreadsheetVersion.EXCEL97)
+       new AreaReference(workbook.getName(name).getRefersToFormula, workbook.getSpreadsheetVersion)
     ).leftMap(_ => ParserError.missingName(name))
 
   def getSafeCell(workbook: Workbook, cellRef: CellReference): Either[ParserError, SafeCell] =

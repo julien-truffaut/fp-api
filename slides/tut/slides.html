@@ -84,14 +84,14 @@ val oilProdFormula = oilProd.getRefersToFormula
 # Excel API: AreaReference
 
 ```tut:silent
-import org.apache.poi.ss.SpreadsheetVersion.EXCEL97
 import org.apache.poi.ss.util.AreaReference
 
 val oilProdFormula = workbook.getName("OilProd").getRefersToFormula
+
+val area = new AreaReference(oilProdFormula, workbook.getSpreadsheetVersion)
 ```
 
 ```tut
-val area = new AreaReference(oilProdFormula, EXCEL97)
 val cellRefs = area.getAllReferencedCells
 
 cellRefs.foreach(println)
@@ -125,7 +125,8 @@ cell.getStringCellValue
 ```tut:silent
 sealed trait ParserError extends Product with Serializable
 
-case class InvalidFormat(ref: String, expectedFormat: String,
+case class InvalidFormat(ref: String,
+                         expectedFormat: String,
                          message: String) extends ParserError
 ```
 
@@ -194,7 +195,7 @@ import cats.instances.list._
 def numericRange(workbook: Workbook,
                  name: String): Either[ParserError, List[Double]] = {
   val formula = workbook.getName(name).getRefersToFormula
-  val area    = new AreaReference(formula, EXCEL97)
+  val area    = new AreaReference(formula, workbook.getSpreadsheetVersion)
   val cells   = area.getAllReferencedCells.toList.map(cellRef =>
     workbook
       .getSheet(cellRef.getSheetName)
@@ -214,7 +215,7 @@ def numericRange(workbook: Workbook,
 ```tut:silent
 def numericRange(workbook: Workbook,
                  name: String): Either[ParserError, List[Double]] = {
-  val area = new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
+  val area = new AreaReference(workbook.getName(name).getRefersToFormula, workbook.getSpreadsheetVersion)
   area.getAllReferencedCells.toList.map(cellRef =>
     workbook
       .getSheet(cellRef.getSheetName)
@@ -237,7 +238,7 @@ numericRange(workbook, "PrimaryProduct")
 ```tut:silent
 def numericRange(workbook: Workbook,
                  name: String): Either[ParserError, List[Double]] = {
-  val area = new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
+  val area = new AreaReference(workbook.getName(name).getRefersToFormula, workbook.getSpreadsheetVersion)
   area.getAllReferencedCells.toList.map(cellRef =>
     workbook
       .getSheet(cellRef.getSheetName)
@@ -282,7 +283,7 @@ case class SafeCell(cell: Cell){
 ```tut:silent
 def getArea(workbook: Workbook, name: String): Either[ParserError, AreaReference] =
   Either.catchNonFatal(
-    new AreaReference(workbook.getName(name).getRefersToFormula, EXCEL97)
+    new AreaReference(workbook.getName(name).getRefersToFormula, workbook.getSpreadsheetVersion)
   ).leftMap(_ => MissingName(name))
 
 def getSafeCell(workbook: Workbook, cellRef: CellReference): Either[ParserError, SafeCell] =
