@@ -13,7 +13,7 @@
         font-family: 'Yanone Kaffeesatz', 'Gill Sans';
         font-weight: normal;
       }
-      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono', 'Consolas', 'Courier New'; }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono', 'Consolas', 'Courier New'; font-size: 120%; }
     </style>
   </head>
   <body>
@@ -25,7 +25,7 @@
 
 class: center, middle
 
-# Excel Parser
+# FP use case: Excel Parser
 `@JulienTruffaut`
 
 ???
@@ -35,14 +35,12 @@ class: center, middle
 ---
 # Use case
 
-.center[![workbook](workbook-all.png)]
+.center[![workbook](workbook-intro.png)]
 
 ---
-# Goals
+# Use case
 
-- retrieve data from a spreadsheet using names
-- use a safe API (no exception, no null)
-- provide combinators to parse into a case class hierarchy
+.center[![workbook](workbook-with-name.png)]
 
 ---
 # Excel API: Workbook
@@ -56,9 +54,7 @@ import org.apache.poi.ss.usermodel.{Workbook, WorkbookFactory}
 
 def load(fileName: String): Workbook =
     WorkbookFactory.create(getClass.getClassLoader.getResourceAsStream(fileName))
-```
 
-```tut
 val workbook = load("example.xlsx")
 ```
 
@@ -108,10 +104,6 @@ val cell = workbook.
   getCell(cellRef.getCol)
 ```
 
-```tut
-cell
-```
-
 --
 
 ```tut
@@ -128,11 +120,7 @@ cell.getStringCellValue
 # Cell error handling
 
 ```tut:silent
-sealed trait ParserError extends Product with Serializable
-
-case class InvalidFormat(ref: String,
-                         expectedFormat: String,
-                         message: String) extends ParserError
+case class ParserError(ref: String, expectedFormat: String, message: String)
 ```
 
 --
@@ -146,12 +134,12 @@ case class SafeCell(cell: Cell){
 
   def asDouble: Either[ParserError, Double] =
     Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
-      InvalidFormat(reference, "Numeric", e.getMessage)
+      ParserError(reference, "Numeric", e.getMessage)
     )
 
   def asString: Either[ParserError, String] =
     Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
-      InvalidFormat(reference, "String", e.getMessage)
+      ParserError(reference, "String", e.getMessage)
     )
 }
 ```
@@ -172,17 +160,15 @@ safeCell.asString
 # Parsing API
 
 ```tut:silent
-def numericRange(workbook: Workbook,
-                 name: String): Either[ParserError, List[Double]] = ???
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
 
-def numeric(workbook: Workbook,
-            name: String): Either[ParserError, Double] = ???
+def numeric(workbook: Workbook, name: String): Either[ParserError, Double] = ???
 
-def stringRange(workbook: Workbook,
-                name: String): Either[ParserError, List[String]] = ???
+def stringRange(workbook: Workbook, name: String): Either[ParserError, List[String]] = ???
 
-def string(workbook: Workbook,
-           name: String): Either[ParserError, String] = ???
+def string(workbook: Workbook, name: String): Either[ParserError, String] = ???
+
+// ...
 ```
 
 ```tut:fail:silent
@@ -260,9 +246,11 @@ numericRange(workbook, "foo")
 ---
 # Parsing Doubles
 
-```tut:silent
+```tut:invisible
 import org.apache.poi.ss.util.{AreaReference, CellReference}
+```
 
+```tut:silent
 sealed trait ParserError extends Product with Serializable
 
 case class InvalidFormat(ref: String, expectedFormat: String, message: String) extends ParserError
@@ -444,7 +432,20 @@ product(oil, foo).parse(workbook)
 ```
 
 ---
-# Parsing Product
+# Parsing Production
+
+```tut
+product(oil, gas).parse(workbook)
+```
+
+```tut:silent
+case class Production(oil: List[Double], gas: List[Double])
+
+def production: Parser[Production] = ???
+```
+
+---
+# Map
 
 ```tut:silent
 def map[A, B](pa: Parser[A])(f: A => B): Parser[B] =
@@ -511,6 +512,11 @@ implicit val instance: Monad[Parser] with SemigroupK[Parser] = new Monad[Parser]
   }
 ```
 
+
+```scala
+implicit val cartesianFunctor: Functor[Parser] with Cartesian[Parser] = ???
+```
+
 ```tut:silent
 import cats.syntax.all._
 
@@ -550,12 +556,10 @@ def numeric(name: String): Parser[Double] =
 ```
 
 ```tut:silent
-val technicalFee: Parser[TechnicalFee] =
-  numeric("TechnicalFee").map(TechnicalFee)
+val technicalFee: Parser[TechnicalFee] = numeric("TechnicalFee").map(TechnicalFee)
 
 val explorationFee: Parser[ExplorationFee] =
-  (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).
-    map(ExplorationFee)
+  (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).map(ExplorationFee)
 ```
 
 --
@@ -612,16 +616,20 @@ fee.parse(workbook)
 # Parser is a SemigroupK
 
 ```scala
-trait SemigroupK[F[_]]{
-  def combineK[A](x: F[A], y: F[A]): F[A]
+trait Semigroup[A]{
+  def combine(x: A, y: A): A
 }
 
-trait Semigroup[A]{
-  def combineK(x: A, y: A): A
+trait SemigroupK[F[_]]{
+  def combineK[A](x: F[A], y: F[A]): F[A]
 }
 ```
 
 --
+
+```scala
+implicit val parserSemigroupK: SemigroupK[Parser] = ...
+```
 
 ```tut:silent
 val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
@@ -632,11 +640,60 @@ fee.parse(workbook)
 ```
 
 ---
+# Is it worth it?
+
+```tut:silent
+val technicalFee = numeric("TechnicalFee").map(TechnicalFee)
+
+val explorationFee = (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).
+    map(ExplorationFee)
+
+val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
+```
+
+---
+# Is it worth it?
+
+```tut:invisible
+def boolean(name: String): Parser[Boolean] =
+  new Parser[Boolean]{
+    def parse(workbook: Workbook) =
+      for {
+        area    <- getArea(workbook, name)
+        cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
+        boolean <- Either.catchNonFatal(cells.head.cell.getBooleanCellValue).leftMap(e =>
+          InvalidFormat(cells.head.reference, "Boolean", e.getMessage)
+        )
+      } yield boolean
+  }
+```
+
+```tut:silent
+import cats.syntax.flatMap._
+
+sealed trait Cost extends Product with Serializable
+
+case class Hardcoded(value: List[Double]) extends Cost
+case class Parametrized(value: Double) extends Cost
+
+val cost = boolean("Cost").flatMap{
+  case true  => numericRange("HardcodedCost").map(Hardcoded).widen[Cost]
+  case false => numeric("ParametrizedCost").map(Parametrized).widen[Cost]
+}
+```
+
+
+---
 # How to find abstractions
 
 ```tut:silent
-def numericRange(workbook: Workbook,
-                 name: String): Either[ParserError, List[Double]] = ???
+def numericRange(workbook: Workbook, name: String): List[Double] = ???
+```
+
+--
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
 ```
 
 --
@@ -647,38 +704,14 @@ trait Parser[A]{
 }
 
 def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
+
+def combine[A](pa: Parser[A], pb: Parser[A]): Parser[A] = ???
 ```
 
 --
 
 ```tut:silent
-def product[F[_], A, B](pa: F[A], pb: F[B]): F[(A, B)] = ???
-```
-
----
-# How to find abstractions
-
-```tut:silent
-trait Parser[A]{
-  def parse(workbook: Workbook): Either[ParserError, A]
-}
-```
-
---
-
-```tut:silent
-case class Kleisli[F[_], A, B](run: A => F[B])
-
-type Parser[A] = Kleisli[Either[ParserError, ?], Workbook, A]
-```
-
---
-
-```tut:silent
-import cats.Semigroup
-
-implicit def semigroup[F[_], A, B](implicit ev: Semigroup[F[B]])
-  : Semigroup[Kleisli[F, A, B]] = ???
+implicit def instances: Functor[Parser] with Cartesian[Parser] with SemigroupK[Parser] = ???
 ```
 
 ---
@@ -689,102 +722,15 @@ Code and slides at `julien-truffaut/excel-parser` on GitHub
 
 ## Questions?
 
----
-# Bonus: sequential dependency
-
-```tut:invisible:reset
-import parser.Parser
-import parser.Parser._
-import parser.ParserError
-import parser.ParserError._
-import parser.io._
-import org.apache.poi.ss.usermodel.{Workbook, WorkbookFactory}
-import cats.syntax.all._
-
-val workbook = load("example.xlsx")
-```
-
-```tut:silent
-sealed trait Cost extends Product with Serializable
-
-case class Hardcoded(value: List[Double]) extends Cost
-case class Parametrized(value: Double) extends Cost
-
-val cost         = boolean("Cost")
-val hardcoded    = numericRange("HardcodedCost").map(Hardcoded)
-val parametrized = numeric("ParametrizedCost").map(Parametrized)
-```
-
-```tut
-cost.parse(workbook)
-hardcoded.parse(workbook)
-parametrized.parse(workbook)
-```
-
----
-# Bonus: sequential dependency
-
-```tut:silent
-val cost = new Parser[Cost]{
-  def parse(workbook: Workbook): Either[ParserError, Cost] =
-    for {
-      costFlag <- boolean("Cost").parse(workbook)
-      cost     <- costFlag match {
-        case true  => numericRange("HardcodedCost").map(Hardcoded).parse(workbook)
-        case false => numeric("ParametrizedCost").map(Parametrized).parse(workbook)
-      }
-    } yield cost
-}
-```
-
-```tut
-cost.parse(workbook)
-```
-
----
-# Bonus: sequential dependency
-
-```tut:silent
-def foo[A, B](pa: Parser[A])(f: A => Parser[B]): Parser[B] = ???
-```
-
---
-
-```tut:silent
-def foo[F[_], A, B](pa: F[A])(f: A => F[B]): F[B] = ???
-```
-
----
-# Bonus: sequential dependency
-
-```tut:silent
-def flatMap[A, B](pa: Parser[A])(f: A => Parser[B]): Parser[B] = new Parser[B]{
-  def parse(workbook: Workbook): Either[ParserError, B] =
-    for {
-      a <- pa.parse(workbook)
-      b <- f(a).parse(workbook)
-    } yield b
-}
-```
-
---
-
-```tut:silent
-val cost = flatMap(boolean("Cost")){
-  case true  => numericRange("HardcodedCost").map(Hardcoded).widen[Cost]
-  case false => numeric("ParametrizedCost").map(Parametrized).widen[Cost]
-}
-```
-
-```tut
-cost.parse(workbook)
-```
 
  </textarea>
     <script src="remark-latest.min.js">
     </script>
     <script>
-      var slideshow = remark.create();
+      var slideshow = remark.create({
+          slideNumberFormat: '',
+          ratio: "16:9"
+      });
     </script>
   </body>
 </html>
