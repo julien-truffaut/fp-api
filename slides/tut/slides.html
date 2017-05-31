@@ -25,7 +25,7 @@
 
 class: center, middle
 
-# FP use case: Excel Parser
+# Functional Programming use case: Excel Parser
 `@JulienTruffaut`
 
 ???
@@ -172,7 +172,27 @@ def string(workbook: Workbook, name: String): Either[ParserError, String] = ???
 ```
 
 ```tut:fail:silent
-numericRange(workbook, "OilProduction")
+numericRange(workbook, "OilProd")
+```
+
+---
+# Parsing Doubles
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = {
+  val formula = workbook.getName(name).getRefersToFormula
+  val area    = new AreaReference(formula, workbook.getSpreadsheetVersion)
+  val cells   = area.getAllReferencedCells.toList.map(cellRef =>
+    workbook
+      .getSheet(cellRef.getSheetName)
+      .getRow(cellRef.getRow)
+      .getCell(cellRef.getCol)
+  )
+
+  val safeCells: List[SafeCell] = cells.map(SafeCell)
+  val doubles: List[Either[ParserError, Double]] = safeCells.map(_.asDouble)
+  ???
+}
 ```
 
 ---
@@ -183,8 +203,7 @@ import cats.syntax.traverse._
 import cats.instances.either._
 import cats.instances.list._
 
-def numericRange(workbook: Workbook,
-                 name: String): Either[ParserError, List[Double]] = {
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = {
   val formula = workbook.getName(name).getRefersToFormula
   val area    = new AreaReference(formula, workbook.getSpreadsheetVersion)
   val cells   = area.getAllReferencedCells.toList.map(cellRef =>
@@ -204,8 +223,7 @@ def numericRange(workbook: Workbook,
 # Parsing Doubles
 
 ```tut:silent
-def numericRange(workbook: Workbook,
-                 name: String): Either[ParserError, List[Double]] = {
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = {
   val area = new AreaReference(workbook.getName(name).getRefersToFormula, workbook.getSpreadsheetVersion)
   area.getAllReferencedCells.toList.map(cellRef =>
     workbook
@@ -339,21 +357,30 @@ def production(workbook: Workbook,
 # Parsing Product
 
 ```tut:silent
+trait Parser[A]
+
+def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
+```
+
+---
+# Parsing Product
+
+```tut:silent
 trait Parser[A]{
   def parse(workbook: Workbook, name: String): Either[ParserError, A]
-}
-
-def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
-
-val numericRange = new Parser[List[Double]]{
-  def parse(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
 }
 ```
 
 --
 
 ```tut:silent
-def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
+val numericRange = new Parser[List[Double]]{
+  def parse(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
+}
+```
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
 ```
 
 ---
@@ -396,12 +423,6 @@ def numericRange(name: String): Parser[List[Double]] =
         doubles <- cells.traverseU(_.asDouble)
       } yield doubles
   }
-```
-
---
-
-```tut:silent
-def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
 ```
 
 ---
@@ -478,7 +499,8 @@ trait Cartesian[F[_]]{
 }
 ```
 
---
+---
+# Parser is a Cartesian Functor
 
 ```tut:invisible
 import cats.{Monad, SemigroupK}
@@ -640,50 +662,6 @@ fee.parse(workbook)
 ```
 
 ---
-# Is it worth it?
-
-```tut:silent
-val technicalFee = numeric("TechnicalFee").map(TechnicalFee)
-
-val explorationFee = (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).
-    map(ExplorationFee)
-
-val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
-```
-
----
-# Is it worth it?
-
-```tut:invisible
-def boolean(name: String): Parser[Boolean] =
-  new Parser[Boolean]{
-    def parse(workbook: Workbook) =
-      for {
-        area    <- getArea(workbook, name)
-        cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
-        boolean <- Either.catchNonFatal(cells.head.cell.getBooleanCellValue).leftMap(e =>
-          InvalidFormat(cells.head.reference, "Boolean", e.getMessage)
-        )
-      } yield boolean
-  }
-```
-
-```tut:silent
-import cats.syntax.flatMap._
-
-sealed trait Cost extends Product with Serializable
-
-case class Hardcoded(value: List[Double]) extends Cost
-case class Parametrized(value: Double) extends Cost
-
-val cost = boolean("Cost").flatMap{
-  case true  => numericRange("HardcodedCost").map(Hardcoded).widen[Cost]
-  case false => numeric("ParametrizedCost").map(Parametrized).widen[Cost]
-}
-```
-
-
----
 # How to find abstractions
 
 ```tut:silent
@@ -715,12 +693,44 @@ implicit def instances: Functor[Parser] with Cartesian[Parser] with SemigroupK[P
 ```
 
 ---
+# Is it worth it?
+
+```tut:silent
+val technicalFee = numeric("TechnicalFee").map(TechnicalFee)
+
+val explorationFee = (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).
+    map(ExplorationFee)
+
+val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
+```
+
+---
 class: center, middle
 
 # Thanks!
 Code and slides at `julien-truffaut/excel-parser` on GitHub
 
 ## Questions?
+
+---
+# Bonus: Sequential composition
+
+```tut:reset:invisible
+import cats.syntax.all._
+import parser.Parser._
+```
+
+```tut:silent
+sealed trait Cost extends Product with Serializable
+
+case class Hardcoded(value: List[Double]) extends Cost
+case class Parametrized(value: Double) extends Cost
+
+val cost = boolean("Cost").flatMap{
+  case true  => numericRange("HardcodedCost").map(Hardcoded).widen[Cost]
+  case false => numeric("ParametrizedCost").map(Parametrized).widen[Cost]
+}
+```
 
 
  </textarea>
