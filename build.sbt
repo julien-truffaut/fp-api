@@ -19,26 +19,26 @@ lazy val baseSettings: Seq[Setting[_]] = Seq(
 )
 
 lazy val excel = project.in(file("."))
-  .settings(moduleName := "excel")
+  .settings(moduleName := "fpapi")
   .settings(baseSettings: _*)
   .aggregate(core, slides)
   .dependsOn(core, slides)
 
 lazy val core = project
-  .settings(moduleName := "excel-core")
+  .settings(moduleName := "fpapi-core")
   .settings(baseSettings: _*)
   .settings(libraryDependencies ++= Seq(
-    "org.typelevel"  %% "cats"       % "0.9.0",
+    "org.typelevel"  %% "cats-core"  % "1.0.0-MF",
     "org.apache.poi"  % "poi-ooxml"  % "3.15",
     "org.scalatest"  %% "scalatest"  % "3.0.1"  % "test"
   ))
 
 
 lazy val slides = project
-  .settings(moduleName := "excel-slides")
+  .settings(moduleName := "fpapi-slides")
   .settings(baseSettings: _*)
-  .settings(tutSettings: _*)
   .settings(
     tutSourceDirectory := baseDirectory.value / "tut",
     tutTargetDirectory := baseDirectory.value / "tut-out"
   ).dependsOn(core)
+  .enablePlugins(TutPlugin)

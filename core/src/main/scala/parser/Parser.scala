@@ -42,7 +42,7 @@ object Parser {
     single(name).flatMapF(_.asBoolean)
 
   def booleanRange(name: String): Parser[List[Boolean]] =
-    range(name).flatMapF(_.traverseU(_.asBoolean))
+    range(name).flatMapF(_.traverse(_.asBoolean))
 
   def booleanInt(name: String): Parser[Boolean] =
     parse(name, int){
@@ -55,19 +55,19 @@ object Parser {
     single(name).flatMapF(_.asDouble)
 
   def numericRange(name: String): Parser[List[Double]] =
-    range(name).flatMapF(_.traverseU(_.asDouble))
+    range(name).flatMapF(_.traverse(_.asDouble))
 
   def int(name: String): Parser[Int] =
     single(name).flatMapF(_.asInt)
 
   def intRange(name: String): Parser[List[Int]] =
-    range(name).flatMapF(_.traverseU(_.asInt))
+    range(name).flatMapF(_.traverse(_.asInt))
 
   def string(name: String): Parser[String] =
     single(name).flatMapF(_.asString)
 
   def stringRange(name: String): Parser[List[String]] =
-    range(name).flatMapF(_.traverseU(_.asString))
+    range(name).flatMapF(_.traverse(_.asString))
 
   def parse[A, B: ClassTag](name: String, row: String => Parser[A])(f: A => Option[B]): Parser[B] =
     row(name).flatMapF(f, invalidFormat(name, implicitly[ClassTag[B]].runtimeClass.getSimpleName, ""))
@@ -86,7 +86,7 @@ object Parser {
     def parse(workbook: Workbook): Either[ParserError, List[SafeCell]] =
       for {
         area  <- getArea(workbook, name)
-        cells <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
+        cells <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
       } yield cells
   }
 

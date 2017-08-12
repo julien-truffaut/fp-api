@@ -20,7 +20,7 @@ class ParserTest extends FreeSpec with Matchers {
       Parser.string("PrimaryProduct").parse(example) shouldEqual Right("Oil")
     }
     "Cartesian" in {
-      (Parser.numeric("ExplorationFee") |@| Parser.numeric("PostExplorationFee")).tupled.parse(example) shouldEqual
+      (Parser.numeric("ExplorationFee"), Parser.numeric("PostExplorationFee")).tupled.parse(example) shouldEqual
          Right((1.4, 5.8))
     }
   }

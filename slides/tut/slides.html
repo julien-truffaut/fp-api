@@ -215,7 +215,7 @@ def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Dou
 
   val safeCells: List[SafeCell] = cells.map(SafeCell)
   val doubles: List[Either[ParserError, Double]] = safeCells.map(_.asDouble)
-  doubles.sequenceU
+  doubles.sequence
 }
 ```
 
@@ -230,7 +230,7 @@ def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Dou
       .getSheet(cellRef.getSheetName)
       .getRow(cellRef.getRow)
       .getCell(cellRef.getCol)
-  ).map(SafeCell).traverseU(_.asDouble)
+  ).map(SafeCell).traverse(_.asDouble)
 }
 ```
 
@@ -253,7 +253,7 @@ def numericRange(workbook: Workbook,
       .getSheet(cellRef.getSheetName)
       .getRow(cellRef.getRow)
       .getCell(cellRef.getCol)
-  ).map(SafeCell).traverseU(_.asDouble)
+  ).map(SafeCell).traverse(_.asDouble)
 }
 ```
 
@@ -313,8 +313,8 @@ def getSafeCell(workbook: Workbook, cellRef: CellReference): Either[ParserError,
 def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] =
   for {
     area    <- getArea(workbook, name)
-    cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
-    doubles <- cells.traverseU(_.asDouble)
+    cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
+    doubles <- cells.traverse(_.asDouble)
   } yield doubles
 ```
 
@@ -419,8 +419,8 @@ def numericRange(name: String): Parser[List[Double]] =
     def parse(workbook: Workbook): Either[ParserError, List[Double]] =
       for {
         area    <- getArea(workbook, name)
-        cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
-        doubles <- cells.traverseU(_.asDouble)
+        cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
+        doubles <- cells.traverse(_.asDouble)
       } yield doubles
   }
 ```
@@ -545,13 +545,13 @@ import cats.syntax.all._
 val oil = numericRange("OilProd")
 val gas = numericRange("GasProd")
 
-val production = (oil |@| gas).map(Production)
+val production = (oil, gas).mapN(Production)
 ```
 
 --
 
 ```tut:silent
-(oil |@| gas |@| foo)
+(oil, gas, foo).tupled
 ```
 
 ---
@@ -571,7 +571,7 @@ def numeric(name: String): Parser[Double] =
     def parse(workbook: Workbook) =
       for {
         area    <- getArea(workbook, name)
-        cells   <- area.getAllReferencedCells.toList.traverseU(getSafeCell(workbook, _))
+        cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
         double  <- cells.head.asDouble
       } yield double
   }
@@ -581,7 +581,7 @@ def numeric(name: String): Parser[Double] =
 val technicalFee: Parser[TechnicalFee] = numeric("TechnicalFee").map(TechnicalFee)
 
 val explorationFee: Parser[ExplorationFee] =
-  (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).map(ExplorationFee)
+  (numeric("ExplorationFee"), numeric("PostExplorationFee")).mapN(ExplorationFee)
 ```
 
 --
@@ -698,8 +698,7 @@ implicit def instances: Functor[Parser] with Cartesian[Parser] with SemigroupK[P
 ```tut:silent
 val technicalFee = numeric("TechnicalFee").map(TechnicalFee)
 
-val explorationFee = (numeric("ExplorationFee") |@| numeric("PostExplorationFee")).
-    map(ExplorationFee)
+val explorationFee = (numeric("ExplorationFee"), numeric("PostExplorationFee")).mapN(ExplorationFee)
 
 val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
 ```
