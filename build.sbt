@@ -7,7 +7,7 @@ lazy val baseSettings: Seq[Setting[_]] = Seq(
     "-language:higherKinds",
     "-language:implicitConversions", "-language:existentials",
     "-unchecked",
-    "-Xfatal-warnings",
+//    "-Xfatal-warnings",
     "-Xlint",
     "-Yno-adapted-args",
 //    "-Ywarn-numeric-widen",
@@ -18,7 +18,7 @@ lazy val baseSettings: Seq[Setting[_]] = Seq(
   resolvers += Resolver.sonatypeRepo("releases")
 )
 
-lazy val excel = project.in(file("."))
+lazy val fpapi = project.in(file("."))
   .settings(moduleName := "fpapi")
   .settings(baseSettings: _*)
   .aggregate(core, slides)
@@ -29,6 +29,7 @@ lazy val core = project
   .settings(baseSettings: _*)
   .settings(libraryDependencies ++= Seq(
     "org.typelevel"  %% "cats-core"  % "1.0.0-MF",
+    "eu.timepit"     %% "refined"    % "0.8.2",
     "org.apache.poi"  % "poi-ooxml"  % "3.15",
     "org.scalatest"  %% "scalatest"  % "3.0.1"  % "test"
   ))
