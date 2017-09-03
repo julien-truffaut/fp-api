@@ -34,30 +34,76 @@ Code and slides at `julien-truffaut/fp-api` on GitHub
 ???
 
 ---
-# 1. Use total functions
+# Function
 
-- total function (all inputs value have a result) => no exception
-- referentially transparent => no side effect, no mutation
+.center[![function](function.JPG)]
 
-- Local reasoning, no need to know the entire application, probably no need to know implementation details
+---
+# Function
+
+.center[![function2](function_2.JPG)]
+
+---
+# Which one is a total function?
+
+```tut:silent
+def inc(x: Int): Int = x + 1
+```
+
+--
+
+```tut:silent
+def reverseFizzBuzz(s: String): Int = s match {
+  case "Fizz"      =>  3
+  case "Buzz"      =>  5
+  case "Fizz Buzz" => 15
+}
+```
+
+--
+
+```tut:silent
+def isAdult(age: Int): Boolean = {
+  require(age >= 0, "age must be positive")
+  age >= 18
+}
+```
 
 ---
 # 1. Use total functions
 
 ```tut:silent
-def isAdult(age: Int): Boolean = age >= 18
+def isAdult(age: Int): Boolean = {
+  require(age >= 0, "age must be positive")
+  age >= 18
+}
 ```
-
---
 
 ```tut
 isAdult(4)
 isAdult(25)
+```
+
+```tut:fail
 isAdult(-10)
 ```
 
 ---
-# 1. Use total functions
+# 1. Use total functions: increase the output type
+
+```tut:silent
+def isAdult(age: Int): Option[Boolean] =
+  if(age < 0) None else Some(age >= 18)
+```
+
+```tut
+isAdult(4)
+isAdult(25)
+isAdult(-2)
+```
+
+---
+# 1. Use total functions: reduce the input type
 
 ```tut:silent
 import eu.timepit.refined.api.Refined
@@ -76,57 +122,12 @@ isAdult(25)
 isAdult(-10)
 ```
 
----
-# 1. Use total functions
-
-```tut:silent
-def isAdult(age: Int): Option[Boolean] =
-  if(age < 0) None else Some(age >= 18)
-```
-
-```tut
-isAdult(4)
-isAdult(25)
-isAdult(-2)
-```
-
----
-# 2. Use pure functions
-
-```tut:silent
-def saveToDb(x: Int): Unit = println(s"Saved $x")
-
-def add(a: Int, b: Int): Int = {
-  val res = a + b
-  saveToDb(res)
-  res
-}
-```
-
-```tut:
-add(2, 3)
-```
-
----
-# 2. Use pure functions
-
-```tut:silent
-def add(a: Int, b: Int): Int = a + b
-```
-
-```tut:silent
-def add(a: Int, b: Int): Int = {
-  val res = a + b
-  res
-}
-```
-
 ???
-- function without {} or only with val are good candidates for pure functions
-- pure function gives us referential transparency => equational reasoning
+- local reasoning
+- more predictable results a.k.a. "it compiles, let's ship it"
 
 ---
-# 3. Few basic building blocks, many combinators
+# 2. Few basic building blocks, many combinators
 
 --
 
@@ -144,7 +145,7 @@ List(1,2) zip List(3,4)
 ```
 
 ---
-# 3. Few basic building blocks, many combinators
+# 2. Few basic building blocks, many combinators
 
 ```tut:silent
 def empty[A]: List[A] = List.apply()
@@ -157,47 +158,12 @@ def flatten[A](xs: List[List[A]]): List[A] =
 ```
 
 ---
-# 3. Unique building block!
+# 2. Unique building block!
 
 .center[![workbook](ring.jpg)]
 
 ???
 - ideally a single function/constructor and the entire API would be derived from it
-
----
-# 4. Properties
-
-```scala
-∀ (xs: List[A]), xs.reverse == xs.foldLeft(List.empty[A])((acc, a) => a :: acc)
-
-∀ (xs: List[A]), xs.reverse.reverse == xs.reverse
-
-∀ (xs: List[A], x: A), (x :: xs).length == xs.length + 1
-
-∀ (xs: List[A], n: Int, m: Int), xs.drop(n).dropRight(m) == xs.dropRight(n).drop(m)
-```
-
----
-# Functional programming API
-
-### 1. total functions
-### 2. pure functions
-### 3. few basic building blocks, many combinators
-### 4. properties
-
----
-# Why functional programming API?
-
-- local reasoning
-- more predictable results a.k.a. "it compiles, let's ship it"
-- pure functions => referential transparency => equational reasoning
-- more powerful tools (hoogle, fusion, memoisation)
-- puzzle like programming
-
----
-# Hoogle
-
-.center[![workbook](hoogle.png)]
 
 ---
 # Use case: Parsing excel
