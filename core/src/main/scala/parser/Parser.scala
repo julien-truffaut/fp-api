@@ -3,6 +3,7 @@ package parser
 import cats.instances.either._
 import cats.instances.list._
 import cats.syntax.either._
+import cats.syntax.functor._
 import cats.syntax.traverse._
 import cats.{Monad, SemigroupK}
 import org.apache.poi.ss.usermodel.Workbook
@@ -20,12 +21,6 @@ trait Parser[A]{ self =>
     def parse(workbook: Workbook): Either[ParserError, B] =
       self.parse(workbook).flatMap(f(_).parse(workbook))
   }
-
-  def flatMapF[B](f: A => Either[ParserError, B]): Parser[B] =
-    flatMap(a => Parser.lift(f(a)))
-
-  def flatMapF[B](f: A => Option[B], ifNone: => ParserError): Parser[B] =
-    flatMap(a => Parser.lift(Either.fromOption(f(a), ifNone)))
 }
 
 object Parser {
@@ -39,48 +34,42 @@ object Parser {
   }
 
   def boolean(name: String): Parser[Boolean] =
-    single(name).flatMapF(_.asBoolean)
+    single(name).map(_.asBoolean).flatMap(lift)
 
   def booleanRange(name: String): Parser[List[Boolean]] =
-    range(name).flatMapF(_.traverse(_.asBoolean))
+    range(name).map(_.traverse(_.asBoolean)).flatMap(lift)
 
   def booleanInt(name: String): Parser[Boolean] =
-    parse(name, int){
-      case 0 => Some(false)
-      case 1 => Some(true)
-      case _ => None
+    int(name).flatMap{
+      case 0 => success(false)
+      case 1 => success(true)
+      case x => fail(invalidFormat(name, "Boolean (0/1)", x.toString))
     }
 
   def numeric(name: String): Parser[Double] =
-    single(name).flatMapF(_.asDouble)
+    single(name).map(_.asDouble).flatMap(lift)
 
   def numericRange(name: String): Parser[List[Double]] =
-    range(name).flatMapF(_.traverse(_.asDouble))
+    range(name).map(_.traverse(_.asDouble)).flatMap(lift)
 
   def int(name: String): Parser[Int] =
-    single(name).flatMapF(_.asInt)
+    single(name).map(_.asInt).flatMap(lift)
 
   def intRange(name: String): Parser[List[Int]] =
-    range(name).flatMapF(_.traverse(_.asInt))
+    range(name).map(_.traverse(_.asInt)).flatMap(lift)
 
   def string(name: String): Parser[String] =
-    single(name).flatMapF(_.asString)
+    single(name).map(_.asString).flatMap(lift)
 
   def stringRange(name: String): Parser[List[String]] =
-    range(name).flatMapF(_.traverse(_.asString))
+    range(name).map(_.traverse(_.asString)).flatMap(lift)
 
-  def parse[A, B: ClassTag](name: String, row: String => Parser[A])(f: A => Option[B]): Parser[B] =
-    row(name).flatMapF(f, invalidFormat(name, implicitly[ClassTag[B]].runtimeClass.getSimpleName, ""))
-
-  def single(name: String): Parser[SafeCell] = new Parser[SafeCell] {
-    def parse(workbook: Workbook): Either[ParserError, SafeCell] =
-      for {
-        area  <- getArea(workbook, name)
-        _     <- if(area.getAllReferencedCells.length == 1) Right(())
-                 else Left(ParserError.invalidFormat(name, "single", "a single value"))
-        cell  <- getSafeCell(workbook, area.getFirstCell)
-      } yield cell
-  }
+  def single(name: String): Parser[SafeCell] =
+    range(name).flatMap{
+      case x :: Nil => success(x)
+      case Nil      => fail(invalidFormat(name, "single cell", "empty"))
+      case _        => fail(invalidFormat(name, "single cell", "several cells"))
+    }
 
   def range(name: String): Parser[List[SafeCell]] = new Parser[List[SafeCell]] {
     def parse(workbook: Workbook): Either[ParserError, List[SafeCell]] =
@@ -110,10 +99,7 @@ object Parser {
     }
 
     def flatMap[A, B](fa: Parser[A])(f: A => Parser[B]): Parser[B] =
-      new Parser[B] {
-        def parse(workbook: Workbook): Either[ParserError, B] =
-          fa.parse(workbook).flatMap(f(_).parse(workbook))
-      }
+      fa.flatMap(f)
 
     def tailRecM[A, B](a: A)(f: A => Parser[Either[A, B]]): Parser[B] = new Parser[B] {
       def parse(workbook: Workbook): Either[ParserError, B] = {
@@ -127,6 +113,6 @@ object Parser {
       }
     }
 
-    def pure[A](x: A): Parser[A] = Parser.success(x)
+    def pure[A](x: A): Parser[A] = success(x)
   }
 }
