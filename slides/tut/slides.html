@@ -242,16 +242,50 @@ val cell = workbook.
   getCell(cellRef.getCol)
 ```
 
---
-
 ```tut
 cell.getNumericCellValue
 ```
 
---
+---
+# Numeric range
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): List[Double] = {
+  val formula = workbook.getName(name).getRefersToFormula
+  val area    = new AreaReference(formula, workbook.getSpreadsheetVersion)
+  val cells   = area.getAllReferencedCells.toList.map(cellRef =>
+    workbook
+      .getSheet(cellRef.getSheetName)
+      .getRow(cellRef.getRow)
+      .getCell(cellRef.getCol)
+  )
+  cells.map(_.getNumericCellValue)
+}
+```
+
+```tut
+numericRange(workbook, "OilProd")
+```
+
+---
+# Parsing Doubles
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): List[Double] = {
+  val formula = workbook.getName(name).getRefersToFormula
+  val area    = new AreaReference(formula, workbook.getSpreadsheetVersion)
+  val cells   = area.getAllReferencedCells.toList.map(cellRef =>
+    workbook
+      .getSheet(cellRef.getSheetName)
+      .getRow(cellRef.getRow)
+      .getCell(cellRef.getCol)
+  )
+  cells.map(_.getNumericCellValue)
+}
+```
 
 ```tut:fail
-cell.getStringCellValue
+numericRange(workbook, "PrimaryProduct")
 ```
 
 ---
@@ -274,43 +308,7 @@ case class SafeCell(cell: Cell){
     Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
       ParserError(reference, "Numeric", e.getMessage)
     )
-
-  def asString: Either[ParserError, String] =
-    Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
-      ParserError(reference, "String", e.getMessage)
-    )
 }
-```
-
----
-# Cell error handling
-
-```tut:silent
-val safeCell = SafeCell(cell)
-```
-
-```tut
-safeCell.asDouble
-safeCell.asString
-```
-
----
-# Parsing API
-
-```tut:silent
-def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
-
-def numeric(workbook: Workbook, name: String): Either[ParserError, Double] = ???
-
-def stringRange(workbook: Workbook, name: String): Either[ParserError, List[String]] = ???
-
-def string(workbook: Workbook, name: String): Either[ParserError, String] = ???
-
-// ...
-```
-
-```tut:fail:silent
-numericRange(workbook, "OilProd")
 ```
 
 ---
@@ -419,11 +417,6 @@ case class SafeCell(cell: Cell){
   def asDouble: Either[ParserError, Double] =
     Either.catchNonFatal(cell.getNumericCellValue).leftMap(e =>
       InvalidFormat(reference, "Numeric", e.getMessage)
-    )
-
-  def asString: Either[ParserError, String] =
-    Either.catchNonFatal(cell.getStringCellValue).leftMap(e =>
-      InvalidFormat(reference, "String", e.getMessage)
     )
 }
 ```
