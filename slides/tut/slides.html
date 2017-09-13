@@ -84,8 +84,8 @@ Try(isAdult(-10))
 # 1. Use total functions: increase the output type
 
 ```tut:silent
-def isAdult(age: Int): Option[Boolean] =
-  if(age < 0) None else Some(age >= 18)
+def isAdult(age: Int): Either[String, Boolean] =
+  if(age < 0) Left(s"$age must be positive") else Right(age >= 18)
 ```
 
 ```tut
@@ -119,18 +119,35 @@ isAdult(-10)
 - more predictable results a.k.a. "it compiles, let's ship it"
 
 ---
+# 1. Use total functions: reduce the input type
+
+```tut:silent
+import eu.timepit.refined._
+
+val x: Int =  5
+val y: Int = 25
+val z: Int = -2
+```
+
+```tut
+refineV[Positive](x).map(isAdult)
+refineV[Positive](y).map(isAdult)
+refineV[Positive](z).map(isAdult)
+```
+
+---
 # 2. Derive most functions
 
 
 ```tut
 List.empty
 List(1,2,3)
-List.fill(4)(1)
 ```
 
 ```tut
 List(1,2) ++ List(3,4)
-List(1,2) zip List(3,4)
+List(1,2,3,4).reverse
+List(List(1,2), List(3,4)).flatten
 ```
 
 ---
