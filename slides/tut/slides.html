@@ -611,22 +611,6 @@ def fail[A](error: ParserError): Parser[A] =
 ```
 
 ---
-# Lift
-
-```tut:silent
-def lift[A](res: Either[ParserError, A]): Parser[A] =
-  new Parser[A] {
-    def parse(workbook: Workbook, name: String): Either[ParserError, A] = res
-  }
-```
-
-```tut:silent
-def success[A](value: A): Parser[A] = lift(Right(value))
-
-def fail[A](error: ParserError): Parser[A] = lift(Left(error))
-```
-
----
 # Numeric
 
 
@@ -649,43 +633,82 @@ val numeric: Parser[Double] = flatMap(numericRange){
 # Numeric
 
 ```tut:silent
+def fail[A](error: String => ParserError): Parser[A] =
+  new Parser[A] {
+    def parse(workbook: Workbook, name: String) = Left(error(name))
+  }
+```
+
+--
+
+```tut:silent
 val numeric: Parser[Double] = flatMap(numericRange){
   case x :: Nil => success(x)
-  case _        => new Parser[Double]{
-    def parse(workbook: Workbook, name: String) =
-      Left(InvalidFormat(name, "Single Numeric", "0 or more than 1 value"))
-  }
+  case _        => fail(name => InvalidFormat(name, "Single Numeric", "0 or more than 1 value"))
 }
 ```
 
 ---
-# Parser
+# Other building blocks
+
+```scala
+val intRange: Parser[List[Int]]
+val int: Parser[Int]
+
+val stringRange: Parser[List[String]]
+val string: Parser[String]
+```
+
+--
+
+```scala
+val oneToRuleThemAll: Parser[???]
+```
+
+---
+# Parsing Product
 
 ```tut:silent
-trait Parser[A] {
-  def parse(workbook: Workbook, name: String): Either[ParserError, A]
-}
+case class Production(oil: List[Double], gas: List[Double])
 ```
 
 ```scala
-val numeric: Parser[Double] = ???
+val production: Parser[Production] = ???
 ```
 
 ---
-# Curried Parser
+# Parsing Product
+
+```tut:silent
+case class Production(oil: List[Double], gas: List[Double])
+
+val production: Parser[Production] = new Parser[Production]{
+  def parse(workbook: Workbook, name: String) =
+   for {
+    oil <- numericRange.parse(workbook, ???)
+    gas <- numericRange.parse(workbook, ???)
+  } yield Production(oil, gas)
+}
+```
+
+---
+# Parser / Curried Parser
+
+```scala
+trait Parser[A] {
+  def parse(workbook: Workbook, name: String): Either[ParserError, A]
+}
+
+val numericRange: Parser[List[Double]] = ???
+```
 
 ```tut:silent
 trait Parser[A] {
   def parse(workbook: Workbook): Either[ParserError, A]
 }
-```
 
-```tut:silent
-def numeric(name: String): Parser[Double] = ???
+def numericRange(name: String): Parser[List[Double]] = ???
 ```
-
----
-# Curried Parser
 
 ```tut:invisible
 def lift[A](res: Either[ParserError, A]): Parser[A] = new Parser[A] {
@@ -711,142 +734,55 @@ def numericRange(name: String): Parser[List[Double]] = new Parser[List[Double]] 
 }
 ```
 
-```tut:silent
-def numeric(name: String): Parser[Double] = flatMap(numericRange(name)){
-  case x :: Nil => success(x)
-  case _        => fail(InvalidFormat(name, "Single Numeric", "0 or more than 1 value"))
-}
-```
-
 ---
-# Remaining building blocks
+# Production
 
 ```tut:silent
-def intRange(string: String): Parser[List[Int]] = ???
-def stringRange(string: String): Parser[List[String]] = ???
-
-def int(string: String): Parser[Int] = ???
-def string(string: String): Parser[String] = ???
-```
-
---
-
-```scala
-def precious(name: String): Parser[???]
-```
-
----
-# Parsing Product
-
-```tut:invisible
-def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] =
-  for {
-    area    <- getArea(workbook, name)
-    cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
-    doubles <- cells.traverse(_.asDouble)
-  } yield doubles
-```
-
-```tut:silent
-case class Production(oil: List[Double], gas: List[Double])
-
-def production(workbook: Workbook,
-               oilName: String,
-               gasName: String
-               ): Either[ParserError, Production] = ???
-```
-
----
-# Parsing Product
-
-
-```tut:silent
-case class Production(oil: List[Double], gas: List[Double])
-
-def production(workbook: Workbook,
-               oilName: String,
-               gasName: String
-               ): Either[ParserError, Production] =
-  for {
-    oil <- numericRange(workbook, oilName)
-    gas <- numericRange(workbook, gasName)
-  } yield Production(oil, gas)
+val production: Parser[Production] =
+  flatMap(numericRange("OilProd"))(oil =>
+    flatMap(numericRange("GasProd"))(gas =>
+      success(Production(oil, gas))
+    )
+  )
 ```
 
 ---
 # Parsing Product
 
 ```tut:silent
-trait Parser[A]
-
 def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
 ```
 
----
-# Parsing Product
+--
 
 ```tut:silent
-trait Parser[A]{
-  def parse(workbook: Workbook, name: String): Either[ParserError, A]
-}
+def map[A, B](pa: Parser[A])(f: A => B): Parser[B] = ???
 ```
 
 --
 
-```tut:silent
-val numericRange = new Parser[List[Double]]{
-  def parse(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
-}
-```
-
-```tut:silent
-def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
-```
-
----
-# Parsing Product
-
-```tut:silent
-trait Parser[A]{
-  def parse(workbook: Workbook, name: String): Either[ParserError, A]
-}
-
-
+```tut:invisible
 def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] =
   new Parser[(A, B)]{
-    def parse(workbook: Workbook, name: String): Either[ParserError, (A, B)] =
+    def parse(workbook: Workbook): Either[ParserError, (A, B)] =
       for {
-        a <- pa.parse(workbook, ???)
-        b <- pb.parse(workbook, ???)
+        a <- pa.parse(workbook)
+        b <- pb.parse(workbook)
       } yield (a, b)
   }
+
+def map[A, B](pa: Parser[A])(f: A => B): Parser[B] = flatMap(pa)(a => success(f(a)))
+```
+
+```tut:silent
+val production: Parser[Production] =
+  map(
+    product(numericRange("OilProd"), numericRange("GasProd"))
+  ){ case (oil, gas) => Production(oil, gas) }
 ```
 
 ---
-# Parser
-
-```tut:silent
-trait Parser[A]{
-  def parse(workbook: Workbook): Either[ParserError, A]
-}
-```
-
---
-
-```tut:silent
-def numericRange(name: String): Parser[List[Double]] =
-  new Parser[List[Double]]{
-    def parse(workbook: Workbook): Either[ParserError, List[Double]] =
-      for {
-        area    <- getArea(workbook, name)
-        cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
-        doubles <- cells.traverse(_.asDouble)
-      } yield doubles
-  }
-```
-
----
-# Parsing Product
+# Product
 
 ```tut:silent
 def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] =
@@ -873,33 +809,33 @@ product(oil, foo).parse(workbook)
 ```
 
 ---
-# Parsing Production
-
-```tut
-product(oil, gas).parse(workbook)
-```
-
-```tut:silent
-case class Production(oil: List[Double], gas: List[Double])
-
-def production: Parser[Production] = ???
-```
-
----
 # Map
 
 ```tut:silent
 def map[A, B](pa: Parser[A])(f: A => B): Parser[B] =
-  new Parser[B]{
-    def parse(workbook: Workbook): Either[ParserError, B] =
-      pa.parse(workbook).map(f)
-  }
+  flatMap(pa)(a => success(f(a)))
 ```
 
 --
 
 ```tut:silent
-val production = map(product(oil, gas)){case (oil, gas) => Production(oil,gas)}
+case class OilProduction(value: List[Double])
+
+val oilProduction = map(numericRange("OilProd"))(OilProduction.apply)
+```
+
+```tut
+oilProduction.parse(workbook)
+```
+
+---
+# Parsing Production
+
+```tut:silent
+val production: Parser[Production] =
+  map(
+    product(numericRange("OilProd"), numericRange("GasProd"))
+  ){ case (oil, gas) => Production(oil, gas) }
 ```
 
 ```tut
@@ -970,12 +906,106 @@ val production = (oil, gas).mapN(Production)
 
 --
 
-```tut:silent
+```tut
 (oil, gas, foo).tupled
 ```
 
 ---
-# Coproduct
+# API Iterations
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): List[Double] = ???
+```
+
+--
+
+```tut:silent
+def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
+```
+
+--
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: Workbook, name: String): Either[ParserError, A]
+}
+```
+
+--
+
+```tut:silent
+trait Parser[A]{
+  def parse(workbook: Workbook): Either[ParserError, A]
+}
+```
+
+--
+
+```tut:silent
+implicit def instances: Functor[Parser] with Cartesian[Parser] = ???
+```
+
+---
+# Is it worth it?
+
+```tut:invisible
+import cats.{Monad, SemigroupK}
+
+implicit val instance: Monad[Parser] with SemigroupK[Parser] = new Monad[Parser] with SemigroupK[Parser] {
+    def combineK[A](x: Parser[A], y: Parser[A]): Parser[A] = new Parser[A] {
+      def parse(workbook: Workbook): Either[ParserError, A] =
+        x.parse(workbook) orElse y.parse(workbook)
+    }
+
+    def flatMap[A, B](fa: Parser[A])(f: A => Parser[B]): Parser[B] =
+      new Parser[B] {
+        def parse(workbook: Workbook): Either[ParserError, B] =
+          fa.parse(workbook).flatMap(f(_).parse(workbook))
+      }
+
+    def tailRecM[A, B](a: A)(f: A => Parser[Either[A, B]]): Parser[B] = new Parser[B] {
+      def parse(workbook: Workbook): Either[ParserError, B] = {
+        def loop(thisA: A): Either[ParserError, B] = f(thisA).parse(workbook) match {
+          case Left(a1)        => Left(a1)
+          case Right(Left(a1)) => loop(a1)
+          case Right(Right(b)) => Right(b)
+        }
+        loop(a)
+      }
+    }
+
+    def pure[A](a: A): Parser[A] = new Parser[A]{
+      def parse(workbook: Workbook) = Right(a)
+    }
+  }
+
+def numericRange(name: String): Parser[List[Double]] = new Parser[List[Double]] {
+  def parse(workbook: Workbook): Either[ParserError, List[Double]] =
+    for {
+      area    <- getArea(workbook, name)
+      cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
+      doubles <- cells.traverse(_.asDouble)
+    } yield doubles
+}
+```
+
+```tut:silent
+val oil: Parser[List[Double]] = numericRange("OilProd")
+val gas: Parser[List[Double]] = numericRange("GasProd")
+
+val production: Parser[Production] = (oil, gas).mapN(Production)
+```
+
+---
+class: center, middle
+
+# Thanks!
+Code and slides at `julien-truffaut/fp-api` on GitHub
+
+## Questions?
+
+---
+# Bonus: Parsing Coproduct
 
 ```tut:silent
 sealed trait Fee extends Product with Serializable
@@ -992,7 +1022,10 @@ def numeric(name: String): Parser[Double] =
       for {
         area    <- getArea(workbook, name)
         cells   <- area.getAllReferencedCells.toList.traverse(getSafeCell(workbook, _))
-        double  <- cells.head.asDouble
+        double  <- cells match {
+          case x :: Nil => x.asDouble
+          case _        => Left(InvalidFormat(name, "Single Numeric", "0 or more than 1 value"))
+        }
       } yield double
   }
 ```
@@ -1080,56 +1113,6 @@ val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
 ```tut
 fee.parse(workbook)
 ```
-
----
-# How to find abstractions
-
-```tut:silent
-def numericRange(workbook: Workbook, name: String): List[Double] = ???
-```
-
---
-
-```tut:silent
-def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Double]] = ???
-```
-
---
-
-```tut:silent
-trait Parser[A]{
-  def parse(workbook: Workbook): Either[ParserError, A]
-}
-
-def product[A, B](pa: Parser[A], pb: Parser[B]): Parser[(A, B)] = ???
-
-def combine[A](pa: Parser[A], pb: Parser[A]): Parser[A] = ???
-```
-
---
-
-```tut:silent
-implicit def instances: Functor[Parser] with Cartesian[Parser] with SemigroupK[Parser] = ???
-```
-
----
-# Is it worth it?
-
-```tut:silent
-val technicalFee = numeric("TechnicalFee").map(TechnicalFee)
-
-val explorationFee = (numeric("ExplorationFee"), numeric("PostExplorationFee")).mapN(ExplorationFee)
-
-val fee = technicalFee.widen[Fee] <+> explorationFee.widen[Fee]
-```
-
----
-class: center, middle
-
-# Thanks!
-Code and slides at `julien-truffaut/fp-api` on GitHub
-
-## Questions?
 
 ---
 # Bonus: Sequential composition
