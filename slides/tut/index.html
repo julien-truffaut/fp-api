@@ -484,6 +484,15 @@ val numericRange: Parser[List[Double]] = new Parser[List[Double]] {
 
 ```tut:silent
 val numeric: Parser[Double] = new Parser[Double] {
+  def parse(workbook: Workbook, name: String): Either[ParserError, Double] = ???
+}
+```
+
+---
+# Numeric
+
+```tut:silent
+val numeric: Parser[Double] = new Parser[Double] {
   def parse(workbook: Workbook, name: String): Either[ParserError, Double] =
     for {
         area    <- getArea(workbook, name)

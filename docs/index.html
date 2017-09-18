@@ -531,6 +531,15 @@ val string      : Parser[String]
 
 ```scala
 val numeric: Parser[Double] = new Parser[Double] {
+  def parse(workbook: Workbook, name: String): Either[ParserError, Double] = ???
+}
+```
+
+---
+# Numeric
+
+```scala
+val numeric: Parser[Double] = new Parser[Double] {
   def parse(workbook: Workbook, name: String): Either[ParserError, Double] =
     for {
         area    <- getArea(workbook, name)
@@ -875,7 +884,7 @@ val production = (oil, gas).mapN(Production)
 
 ```scala
 scala> (oil, gas, foo).tupled
-res56: Parser[(List[Double], List[Double], List[Double])] = $anon$1$$anon$3@4885b7f0
+res56: Parser[(List[Double], List[Double], List[Double])] = $anon$1$$anon$3@ef398c1
 ```
 
 ---
