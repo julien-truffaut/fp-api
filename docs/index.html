@@ -65,7 +65,7 @@ scala> isAdult(-10)
 java.lang.IllegalArgumentException: requirement failed: age must be positive
   at scala.Predef$.require(Predef.scala:277)
   at .isAdult(<console>:13)
-  ... 207 elided
+  ... 205 elided
 ```
 
 ---
@@ -319,7 +319,7 @@ java.lang.IllegalStateException: Cannot get a NUMERIC value from a STRING cell
   at .$anonfun$numericRange$2$adapted(<console>:35)
   at scala.collection.immutable.List.map(List.scala:272)
   at .numericRange(<console>:35)
-  ... 623 elided
+  ... 621 elided
 ```
 
 ---
@@ -433,7 +433,7 @@ def numericRange(workbook: Workbook, name: String): Either[ParserError, List[Dou
 scala> numericRange(workbook, "foo")
 java.lang.NullPointerException
   at .numericRange(<console>:43)
-  ... 839 elided
+  ... 837 elided
 ```
 
 ---
@@ -875,7 +875,7 @@ val production = (oil, gas).mapN(Production)
 
 ```scala
 scala> (oil, gas, foo).tupled
-res56: Parser[(List[Double], List[Double], List[Double])] = $anon$1$$anon$3@71b90755
+res56: Parser[(List[Double], List[Double], List[Double])] = $anon$1$$anon$3@342b8e43
 ```
 
 ---
